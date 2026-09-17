@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-HTML_CONTENT = """
+HTML_CONTENT = r"""
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -71,29 +71,64 @@ HTML_CONTENT = """
     <div class="info">IP Manzil: <span id="ip">Yuklanmoqda...</span></div>
     <div class="info">Aniq Manzil: <span id="location">GPS kutilmoqda...</span></div>
     <div class="info">Eng Yaqin Maktab: <span id="school">Qidirilmoqda...</span></div>
-    <div class="info">Qurilma / Brauzer: <span id="model">Aniqlanmoqda...</span></div>
+    <div class="info">Qurilma Nomi: <span id="device-model">Aniqlanmoqda...</span></div>
+    <div class="info">Versiya: <span id="os-version">Aniqlanmoqda...</span></div>
 </div>
 
 <script>
-    // Qurilma va brauzerni aniqlash funksiyasi
+    // Qurilma nomi va versiyasini alohida aniqlash
     function getDeviceInfo() {
         const ua = navigator.userAgent;
-        let device = "Kompyuter / Noma'lum";
+        let model = "Noma'lum qurilma";
+        let version = "Noma'lum versiya";
 
+        // Android uchun
         if (/android/i.test(ua)) {
-            let match = ua.match(/;\s([^;]+)\sBuild\//) || ua.match(/\(([^)]+)\)/);
-            device = match ? "Android (" + match[1].split(';').pop().trim() + ")" : "Android Telefon";
-        } else if (/iphone|ipad|ipod/i.test(ua)) {
-            device = "Apple iOS Qurilma";
-        } else if (/windows/i.test(ua)) {
-            device = "Windows Kompyuter";
-        } else if (/macintosh|mac os x/i.test(ua)) {
-            device = "Mac Kompyuter";
+            // Android versiyasini topish
+            let verMatch = ua.match(/Android\s([0-9\.]+)/i);
+            version = verMatch ? "Android " + verMatch[1] : "Android OS";
+
+            // Qurilma modelini topish (masalan: SM-A225F)
+            let buildMatch = ua.match(/;\s([^;]+)\sBuild\//);
+            if (buildMatch) {
+                model = buildMatch[1].trim();
+            } else {
+                // Agar Build topilmasa, qavs ichidagi qismdan qidirish
+                let parenMatch = ua.match(/\(([^)]+)\)/);
+                if (parenMatch) {
+                    let parts = parenMatch[1].split(';');
+                    if (parts.length > 1) {
+                        model = parts[parts.length - 1].trim();
+                    } else {
+                        model = parts[0].trim();
+                    }
+                }
+            }
+        } 
+        // iOS (iPhone / iPad) uchun
+        else if (/iphone|ipad|ipod/i.test(ua)) {
+            let verMatch = ua.match(/OS\s([0-9_]+)/i);
+            version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
+            model = /ipad/i.test(ua) ? "Apple iPad" : "Apple iPhone";
+        } 
+        else if (/windows/i.test(ua)) {
+            model = "Windows PC";
+            version = "Windows OS";
+        } 
+        else if (/macintosh|mac os x/i.test(ua)) {
+            model = "Macintosh";
+            version = "Mac OS";
+        } 
+        else if (/linux/i.test(ua)) {
+            model = "Linux PC";
+            version = "Linux OS";
         }
-        return device;
+
+        document.getElementById('device-model').innerText = model;
+        document.getElementById('os-version').innerText = version;
     }
 
-    document.getElementById('model').innerText = getDeviceInfo();
+    getDeviceInfo();
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
         let R = 6371e3;
