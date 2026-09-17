@@ -76,34 +76,30 @@ HTML_CONTENT = r"""
 </div>
 
 <script>
-    // Qurilma nomi va versiyasini to'g'ri aniqlash
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let model = "Android Qurilma";
         let version = "Android OS";
 
-        // Android uchun
         if (/android/i.test(ua)) {
+            // Android versiyasini aniqlash
             let verMatch = ua.match(/Android\s([0-9\.]+)/i);
             if (verMatch) {
                 version = "Android " + verMatch[1];
             }
 
-            // Samsung va boshqa modellar uchun Build oldidagi yoki qavs ichidagi nomni to'g'ri olish
-            let buildMatch = ua.match(/\s+([^\s]+)\s+Build\//);
-            if (buildMatch && buildMatch[1].length > 1) {
-                model = buildMatch[1];
-            } else {
-                let parts = ua.split(';');
-                if (parts.length >= 2) {
-                    let potentialModel = parts[parts.length - 2].trim();
-                    if (potentialModel && !potentialModel.includes("Mobile") && !potentialModel.includes("Apple")) {
-                        model = potentialModel;
+            // Modelni Build/ so'zidan oldingi qismdan aniq sug'urib olish
+            let parts = ua.split(';');
+            for (let part of parts) {
+                if (part.includes('Build/')) {
+                    let subParts = part.trim().split(' ');
+                    let buildIdx = subParts.findIndex(p => p.startsWith('Build/'));
+                    if (buildIdx > 0) {
+                        model = subParts[buildIdx - 1];
                     }
                 }
             }
         } 
-        // iOS uchun
         else if (/iphone|ipad|ipod/i.test(ua)) {
             let verMatch = ua.match(/OS\s([0-9_]+)/i);
             version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
