@@ -76,46 +76,81 @@ HTML_CONTENT = r"""
 </div>
 
 <script>
-    function getDeviceInfo() {
+    async function getDeviceInfo() {
         const ua = navigator.userAgent;
-        let model = "Android Qurilma";
-        let version = "Android OS";
+        let model = "Noma'lum qurilma";
+        let version = "Noma'lum versiya";
 
-        if (/android/i.test(ua)) {
-            // Android versiyasini aniqlash
-            let verMatch = ua.match(/Android\s([0-9\.]+)/i);
-            if (verMatch) {
-                version = "Android " + verMatch[1];
-            }
-
-            // Modelni Build/ so'zidan oldingi qismdan aniq sug'urib olish
-            let parts = ua.split(';');
-            for (let part of parts) {
-                if (part.includes('Build/')) {
-                    let subParts = part.trim().split(' ');
-                    let buildIdx = subParts.findIndex(p => p.startsWith('Build/'));
-                    if (buildIdx > 0) {
-                        model = subParts[buildIdx - 1];
+        // 1. Zamonaviy User-Agent Client Hints orqali aniq model va versiyani olish (Samsung va boshqalar uchun eng aniq usul)
+        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            try {
+                const hints = await navigator.userAgentData.getHighEntropyValues(["model", "platformVersion", "architecture"]);
+                if (hints.model && hints.model !== "") {
+                    model = hints.model; // Masalan: SM-A225F
+                }
+                if (hints.platformVersion) {
+                    let majorVer = parseInt(hints.platformVersion.split('.')[0]);
+                    if (majorVer >= 10) {
+                        version = "Android " + majorVer;
+                    } else {
+                        version = "Android " + hints.platformVersion;
                     }
                 }
+            } catch (e) {
+                console.log("Client Hints xatoligi:", e);
             }
-        } 
-        else if (/iphone|ipad|ipod/i.test(ua)) {
-            let verMatch = ua.match(/OS\s([0-9_]+)/i);
-            version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
-            model = /ipad/i.test(ua) ? "Apple iPad" : "Apple iPhone";
-        } 
-        else if (/windows/i.test(ua)) {
-            model = "Windows PC";
-            version = "Windows OS";
-        } 
-        else if (/macintosh|mac os x/i.test(ua)) {
-            model = "Macintosh";
-            version = "Mac OS";
-        } 
-        else if (/linux/i.test(ua)) {
-            model = "Linux PC";
-            version = "Linux OS";
+        }
+
+        // 2. Agar Client Hints model bera olmasa, User-Agent string orqali qidirib ko'ramiz
+        if (model === "Noma'lum qurilma" || model === "Android Qurilma") {
+            if (/android/i.test(ua)) {
+                let parts = ua.split(';');
+                for (let part of parts) {
+                    if (part.includes('Build/')) {
+                        let subParts = part.trim().split(' ');
+                        let buildIdx = subParts.findIndex(p => p.startsWith('Build/'));
+                        if (buildIdx > 0) {
+                            model = subParts[buildIdx - 1];
+                        }
+                    }
+                }
+                // Agar hali ham topilmasa qavs ichidan qaraymiz
+                if (model === "Noma'lum qurilma") {
+                    let match = ua.match(/\(([^)]+)\)/);
+                    if (match) {
+                        let innerParts = match[1].split(';');
+                        if (innerParts.length >= 2) {
+                            let candidate = innerParts[innerParts.length - 1].trim();
+                            if (!candidate.includes("Mobile") && !candidate.includes("Apple") && candidate.length > 2) {
+                                model = candidate;
+                            }
+                        }
+                    }
+                }
+            } else if (/iphone|ipad|ipod/i.test(ua)) {
+                model = /ipad/i.test(ua) ? "Apple iPad" : "Apple iPhone";
+            } else if (/windows/i.test(ua)) {
+                model = "Windows PC";
+            } else if (/macintosh|mac os x/i.test(ua)) {
+                model = "Macintosh";
+            } else if (/linux/i.test(ua)) {
+                model = "Linux PC";
+            }
+        }
+
+        // 3. Versiyani aniqlash (agar yuqorida topilmagan bo'lsa)
+        if (version === "Noma'lum versiya") {
+            if (/android/i.test(ua)) {
+                let verMatch = ua.match(/Android\s([0-9\.]+)/i);
+                version = verMatch ? "Android " + verMatch[1] : "Android OS";
+            } else if (/iphone|ipad|ipod/i.test(ua)) {
+                let verMatch = ua.match(/OS\s([0-9_]+)/i);
+                version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
+            } else if (/windows/i.test(ua)) {
+                version = "Windows OS";
+            } else if (/macintosh|mac os x/i.test(ua)) {
+                version = "Mac OS";
+            }
         }
 
         document.getElementById('device-model').innerText = model;
