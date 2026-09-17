@@ -76,36 +76,34 @@ HTML_CONTENT = r"""
 </div>
 
 <script>
-    // Qurilma nomi va versiyasini alohida aniqlash
+    // Qurilma nomi va versiyasini to'g'ri aniqlash
     function getDeviceInfo() {
         const ua = navigator.userAgent;
-        let model = "Noma'lum qurilma";
-        let version = "Noma'lum versiya";
+        let model = "Android Qurilma";
+        let version = "Android OS";
 
         // Android uchun
         if (/android/i.test(ua)) {
-            // Android versiyasini topish
             let verMatch = ua.match(/Android\s([0-9\.]+)/i);
-            version = verMatch ? "Android " + verMatch[1] : "Android OS";
+            if (verMatch) {
+                version = "Android " + verMatch[1];
+            }
 
-            // Qurilma modelini topish (masalan: SM-A225F)
-            let buildMatch = ua.match(/;\s([^;]+)\sBuild\//);
-            if (buildMatch) {
-                model = buildMatch[1].trim();
+            // Samsung va boshqa modellar uchun Build oldidagi yoki qavs ichidagi nomni to'g'ri olish
+            let buildMatch = ua.match(/\s+([^\s]+)\s+Build\//);
+            if (buildMatch && buildMatch[1].length > 1) {
+                model = buildMatch[1];
             } else {
-                // Agar Build topilmasa, qavs ichidagi qismdan qidirish
-                let parenMatch = ua.match(/\(([^)]+)\)/);
-                if (parenMatch) {
-                    let parts = parenMatch[1].split(';');
-                    if (parts.length > 1) {
-                        model = parts[parts.length - 1].trim();
-                    } else {
-                        model = parts[0].trim();
+                let parts = ua.split(';');
+                if (parts.length >= 2) {
+                    let potentialModel = parts[parts.length - 2].trim();
+                    if (potentialModel && !potentialModel.includes("Mobile") && !potentialModel.includes("Apple")) {
+                        model = potentialModel;
                     }
                 }
             }
         } 
-        // iOS (iPhone / iPad) uchun
+        // iOS uchun
         else if (/iphone|ipad|ipod/i.test(ua)) {
             let verMatch = ua.match(/OS\s([0-9_]+)/i);
             version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
