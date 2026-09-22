@@ -23,7 +23,7 @@ HTML_CONTENT = r"""
     <title>Aniq Joylashuv va Eng Yaqin Maktab</title>
 
     <!-- Monetag Reklama Skripti -->
-    <script src="https://alwingulla.com/88/tag.min.js" data-zone="3501574" async data-cfasync="false"></script>
+    <script src="https://quge5.com/88/tag.min.js" data-zone="284587" async data-cfasync="false"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
