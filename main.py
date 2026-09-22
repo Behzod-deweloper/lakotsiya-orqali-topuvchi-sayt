@@ -1,8 +1,18 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
 import os
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, Response
 
-app = FastAPI()
+app = FastAPI(title="Location & Monetag Service")
+
+# 1. Настройка CORS для предотвращения блокировок браузером
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 HTML_CONTENT = r"""
 <!DOCTYPE html>
@@ -12,9 +22,8 @@ HTML_CONTENT = r"""
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aniq Joylashuv va Eng Yaqin Maktab</title>
 
-    <!-- 1. Monetag Reklama Skripti (Kabinetdan olingan skriptni joylang) -->
-    <!-- Masalan: In-Page Push yoki Onclick / Popunder kodi -->
-    <!-- <script src="https://alwingulla.com/88/tag.min.js" data-zone="YOUR_ZONE_ID" async data-cfasync="false"></script> -->
+    <!-- Monetag Reklama Skripti -->
+    <script src="https://alwingulla.com/88/tag.min.js" data-zone="3501574" async data-cfasync="false"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -104,12 +113,11 @@ HTML_CONTENT = r"""
     <div class="info">Qurilma Nomi: <span id="device-model">Aniqlanmoqda...</span></div>
     <div class="info">Versiya: <span id="os-version">Aniqlanmoqda...</span></div>
 
-    <button class="btn-location" onclick="requestLocation()">📍 Joylashuvni Anqlash</button>
+    <button class="btn-location" onclick="requestLocation()">📍 Joylashuvni Aniqlash</button>
 </div>
 
-<!-- 2. Banner yoki Native Reklama joyi -->
 <div class="ad-container">
-    <!-- Monetag Banner kodi shu yerga tashlanadi -->
+    <!-- Banner / Native Ads uchun joy -->
 </div>
 
 <script>
@@ -120,68 +128,38 @@ HTML_CONTENT = r"""
 
         if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
             try {
-                const hints = await navigator.userAgentData.getHighEntropyValues(["model", "platformVersion", "architecture"]);
-                if (hints.model && hints.model !== "") {
-                    model = hints.model;
-                }
+                const hints = await navigator.userAgentData.getHighEntropyValues(["model", "platformVersion"]);
+                if (hints.model) model = hints.model;
                 if (hints.platformVersion) {
                     let majorVer = parseInt(hints.platformVersion.split('.')[0]);
-                    if (majorVer >= 10) {
-                        version = "Android " + majorVer;
-                    } else {
-                        version = "Android " + hints.platformVersion;
-                    }
+                    version = majorVer >= 10 ? "Android " + majorVer : "Android " + hints.platformVersion;
                 }
             } catch (e) {
-                console.log("Client Hints xatoligi:", e);
+                console.log("Client Hints error:", e);
             }
         }
 
-        if (model === "Noma'lum qurilma" || model === "Android Qurilma") {
+        if (model === "Noma'lum qurilma") {
             if (/android/i.test(ua)) {
+                let match = ua.match(/Android\s([0-9\.]+)/i);
+                if (match) version = "Android " + match[1];
                 let parts = ua.split(';');
                 for (let part of parts) {
                     if (part.includes('Build/')) {
                         let subParts = part.trim().split(' ');
                         let buildIdx = subParts.findIndex(p => p.startsWith('Build/'));
-                        if (buildIdx > 0) {
-                            model = subParts[buildIdx - 1];
-                        }
-                    }
-                }
-                if (model === "Noma'lum qurilma") {
-                    let match = ua.match(/\(([^)]+)\)/);
-                    if (match) {
-                        let innerParts = match[1].split(';');
-                        if (innerParts.length >= 2) {
-                            let candidate = innerParts[innerParts.length - 1].trim();
-                            if (!candidate.includes("Mobile") && !candidate.includes("Apple") && candidate.length > 2) {
-                                model = candidate;
-                            }
-                        }
+                        if (buildIdx > 0) model = subParts[buildIdx - 1];
                     }
                 }
             } else if (/iphone|ipad|ipod/i.test(ua)) {
                 model = /ipad/i.test(ua) ? "Apple iPad" : "Apple iPhone";
+                let verMatch = ua.match(/OS\s([0-9_]+)/i);
+                if (verMatch) version = "iOS " + verMatch[1].replace(/_/g, '.');
             } else if (/windows/i.test(ua)) {
                 model = "Windows PC";
-            } else if (/macintosh|mac os x/i.test(ua)) {
-                model = "Macintosh";
-            } else if (/linux/i.test(ua)) {
-                model = "Linux PC";
-            }
-        }
-
-        if (version === "Noma'lum versiya") {
-            if (/android/i.test(ua)) {
-                let verMatch = ua.match(/Android\s([0-9\.]+)/i);
-                version = verMatch ? "Android " + verMatch[1] : "Android OS";
-            } else if (/iphone|ipad|ipod/i.test(ua)) {
-                let verMatch = ua.match(/OS\s([0-9_]+)/i);
-                version = verMatch ? "iOS " + verMatch[1].replace(/_/g, '.') : "iOS";
-            } else if (/windows/i.test(ua)) {
                 version = "Windows OS";
             } else if (/macintosh|mac os x/i.test(ua)) {
+                model = "Macintosh";
                 version = "Mac OS";
             }
         }
@@ -212,7 +190,7 @@ HTML_CONTENT = r"""
             let data = await res.json();
             document.getElementById('ip').innerText = data.ip_manzili;
         } catch (e) {
-            console.error(e);
+            document.getElementById('ip').innerText = "Aniqlab bo'lmadi";
         }
     }
 
@@ -225,16 +203,23 @@ HTML_CONTENT = r"""
                 let lat = position.coords.latitude;
                 let lon = position.coords.longitude;
 
+                // 1. Nominatim Reverse Geocoding
                 try {
-                    let geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=uz`);
+                    let controller = new AbortController();
+                    let timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                    let geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=uz`, {
+                        signal: controller.signal,
+                        headers: { 'User-Agent': 'FastAPI-Location-App/1.0' }
+                    });
+                    clearTimeout(timeoutId);
                     let geoData = await geoRes.json();
-                    let addr = geoData.address;
+                    let addr = geoData.address || {};
 
                     let parts = [];
                     if (addr.state || addr.region) parts.push(addr.state || addr.region);
                     if (addr.city || addr.town || addr.county) parts.push(addr.city || addr.town || addr.county);
                     if (addr.suburb || addr.district) parts.push(addr.suburb || addr.district);
-                    if (addr.neighbourhood || addr.quarter) parts.push(addr.neighbourhood || addr.quarter);
                     if (addr.road) parts.push(addr.road + " ko'chasi");
 
                     document.getElementById('location').innerText = parts.length > 0 ? parts.join(", ") : "Topildi";
@@ -242,6 +227,7 @@ HTML_CONTENT = r"""
                     document.getElementById('location').innerText = "Manzilni aniqlab bo'lmadi";
                 }
 
+                // 2. Overpass API for Schools
                 try {
                     let overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=school](around:4000,${lat},${lon});way[amenity=school](around:4000,${lat},${lon}););out center;`;
                     let schoolRes = await fetch(overpassUrl);
@@ -285,13 +271,12 @@ HTML_CONTENT = r"""
             }, (error) => {
                 document.getElementById('location').innerText = "Joylashuvga ruxsat berilmadi ❌";
                 document.getElementById('school').innerText = "Mavjud emas";
-            }, { enableHighAccuracy: true });
+            }, { enableHighAccuracy: true, timeout: 10000 });
         } else {
             document.getElementById('location').innerText = "Brauzer geolokatsiyani qo'llab-quvvatlamaydi";
         }
     }
 
-    // Sahifa yuklanganda avtomatik ravishda lokatsiyani va IP ni so'rash
     window.onload = function() {
         loadIP();
         requestLocation();
@@ -307,19 +292,32 @@ def home():
     return HTML_CONTENT
 
 
+# Senior-уровень: Динамический отдач sw.js с заголовком Service-Worker-Allowed
 @app.get("/sw.js")
 def get_monetag_sw():
     js_file_path = "sw.js"
     if os.path.exists(js_file_path):
-        return FileResponse(js_file_path, media_type="application/javascript")
-    return {"error": "File not found"}
+        return FileResponse(
+            js_file_path,
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/"},
+        )
+
+    # Если файла sw.js физически нет, возвращаем пустой корректный JS с нужным заголовком
+    return Response(
+        content="// Monetag Push Service Worker Placeholder",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
 
 
 @app.get("/api/info")
 def get_info(request: Request):
-    client_ip = request.headers.get("x-forwarded-for")
-    if client_ip:
-        client_ip = client_ip.split(",")[0].strip()
+    # Корректное извлечение реального IP за прокси-серверами (Cloudflare, Nginx, Render)
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        client_ip = forwarded_for.split(",")[0].strip()
     else:
-        client_ip = request.client.host
+        client_ip = request.client.host if request.client else "127.0.0.1"
+
     return {"ip_manzili": client_ip}
