@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+import os
 
 app = FastAPI()
 
@@ -10,6 +11,11 @@ HTML_CONTENT = r"""
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aniq Joylashuv va Eng Yaqin Maktab</title>
+
+    <!-- 1. Monetag Anti-AdBlock / In-Page Push yoki SDK скрипт (Вставьте ваш код из Monetag здесь) -->
+    <!-- Пример скрипта Monetag: -->
+    <!-- <script src="https://alwingulla.com/88/tag.min.js" data-zone="XXXXXX" async data-cfasync="false"></script> -->
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -17,6 +23,7 @@ HTML_CONTENT = r"""
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 20px;
@@ -58,6 +65,13 @@ HTML_CONTENT = r"""
             word-break: break-word;
             max-width: 60%;
         }
+        /* Рекламный блок */
+        .ad-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 550px;
+            text-align: center;
+        }
         @media (max-width: 480px) {
             .card { padding: 20px; }
             .info { font-size: 14px; flex-direction: column; align-items: flex-start; }
@@ -66,6 +80,7 @@ HTML_CONTENT = r"""
     </style>
 </head>
 <body>
+
 <div class="card">
     <h2>📍 Joylashuv va Maktab Tizimi</h2>
     <div class="info">IP Manzil: <span id="ip">Yuklanmoqda...</span></div>
@@ -75,18 +90,22 @@ HTML_CONTENT = r"""
     <div class="info">Versiya: <span id="os-version">Aniqlanmoqda...</span></div>
 </div>
 
+<!-- 2. Рекламный баннер под карточкой (если выбрали формат Banner / Native Banner) -->
+<div class="ad-container">
+    <!-- Вставьте код баннера из личного кабинета Monetag сюда -->
+</div>
+
 <script>
     async function getDeviceInfo() {
         const ua = navigator.userAgent;
         let model = "Noma'lum qurilma";
         let version = "Noma'lum versiya";
 
-        // 1. Zamonaviy User-Agent Client Hints orqali aniq model va versiyani olish (Samsung va boshqalar uchun eng aniq usul)
         if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
             try {
                 const hints = await navigator.userAgentData.getHighEntropyValues(["model", "platformVersion", "architecture"]);
                 if (hints.model && hints.model !== "") {
-                    model = hints.model; // Masalan: SM-A225F
+                    model = hints.model;
                 }
                 if (hints.platformVersion) {
                     let majorVer = parseInt(hints.platformVersion.split('.')[0]);
@@ -101,7 +120,6 @@ HTML_CONTENT = r"""
             }
         }
 
-        // 2. Agar Client Hints model bera olmasa, User-Agent string orqali qidirib ko'ramiz
         if (model === "Noma'lum qurilma" || model === "Android Qurilma") {
             if (/android/i.test(ua)) {
                 let parts = ua.split(';');
@@ -114,7 +132,6 @@ HTML_CONTENT = r"""
                         }
                     }
                 }
-                // Agar hali ham topilmasa qavs ichidan qaraymiz
                 if (model === "Noma'lum qurilma") {
                     let match = ua.match(/\(([^)]+)\)/);
                     if (match) {
@@ -138,7 +155,6 @@ HTML_CONTENT = r"""
             }
         }
 
-        // 3. Versiyani aniqlash (agar yuqorida topilmagan bo'lsa)
         if (version === "Noma'lum versiya") {
             if (/android/i.test(ua)) {
                 let verMatch = ua.match(/Android\s([0-9\.]+)/i);
@@ -184,7 +200,6 @@ HTML_CONTENT = r"""
                     let lat = position.coords.latitude;
                     let lon = position.coords.longitude;
 
-                    // Manzilni aniqlash
                     try {
                         let geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=uz`);
                         let geoData = await geoRes.json();
@@ -202,7 +217,6 @@ HTML_CONTENT = r"""
                         document.getElementById('location').innerText = "Manzilni aniqlab bo'lmadi";
                     }
 
-                    // Maktabni qidirish
                     try {
                         let overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=school](around:4000,${lat},${lon});way[amenity=school](around:4000,${lat},${lon}););out center;`;
                         let schoolRes = await fetch(overpassUrl);
@@ -262,6 +276,16 @@ HTML_CONTENT = r"""
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTML_CONTENT
+
+
+# 3. Эндпоинт для подтверждения сайта Monetag через JS-файл
+# Положите JS-файл от Monetag в папку проекта (например, с именем sw.js)
+@app.get("/sw.js")
+def get_monetag_sw():
+    js_file_path = "sw.js"  # Укажите точное имя файла, который вы скачали
+    if os.path.exists(js_file_path):
+        return FileResponse(js_file_path, media_type="application/javascript")
+    return {"error": "File not found"}
 
 
 @app.get("/api/info")
