@@ -5,7 +5,6 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 
 app = FastAPI(title="Location & Monetag Service")
 
-# 1. Настройка CORS для предотвращения блокировок браузером
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,7 +21,7 @@ HTML_CONTENT = r"""
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aniq Joylashuv va Eng Yaqin Maktab</title>
 
-    <!-- Monetag Reklama Skripti -->
+    <!-- Monetag MultiTag Skripti -->
     <script src="https://quge5.com/88/tag.min.js" data-zone="284587" async data-cfasync="false"></script>
 
     <style>
@@ -96,6 +95,22 @@ HTML_CONTENT = r"""
             max-width: 550px;
             text-align: center;
         }
+        .custom-banner {
+            display: block;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            transition: transform 0.2s ease;
+        }
+        .custom-banner:hover {
+            transform: scale(1.02);
+        }
+        .custom-banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
         @media (max-width: 480px) {
             .card { padding: 20px; }
             .info { font-size: 14px; flex-direction: column; align-items: flex-start; }
@@ -116,8 +131,10 @@ HTML_CONTENT = r"""
     <button class="btn-location" onclick="requestLocation()">📍 Joylashuvni Aniqlash</button>
 </div>
 
+<!-- Banner Reklama Blloku -->
+<!-- Banner Reklama Blloku -->
 <div class="ad-container">
-    <!-- Banner / Native Ads uchun joy -->
+    <script async="async" data-cfasync="false" src="//alwingulla.com/native/tag.min.js" data-zone="11864269"></script>
 </div>
 
 <script>
@@ -203,7 +220,6 @@ HTML_CONTENT = r"""
                 let lat = position.coords.latitude;
                 let lon = position.coords.longitude;
 
-                // 1. Nominatim Reverse Geocoding
                 try {
                     let controller = new AbortController();
                     let timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -227,7 +243,6 @@ HTML_CONTENT = r"""
                     document.getElementById('location').innerText = "Manzilni aniqlab bo'lmadi";
                 }
 
-                // 2. Overpass API for Schools
                 try {
                     let overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=school](around:4000,${lat},${lon});way[amenity=school](around:4000,${lat},${lon}););out center;`;
                     let schoolRes = await fetch(overpassUrl);
@@ -292,7 +307,6 @@ def home():
     return HTML_CONTENT
 
 
-# Senior-уровень: Динамический отдач sw.js с заголовком Service-Worker-Allowed
 @app.get("/sw.js")
 def get_monetag_sw():
     js_file_path = "sw.js"
@@ -302,8 +316,6 @@ def get_monetag_sw():
             media_type="application/javascript",
             headers={"Service-Worker-Allowed": "/"},
         )
-
-    # Если файла sw.js физически нет, возвращаем пустой корректный JS с нужным заголовком
     return Response(
         content="// Monetag Push Service Worker Placeholder",
         media_type="application/javascript",
@@ -313,7 +325,6 @@ def get_monetag_sw():
 
 @app.get("/api/info")
 def get_info(request: Request):
-    # Корректное извлечение реального IP за прокси-серверами (Cloudflare, Nginx, Render)
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
         client_ip = forwarded_for.split(",")[0].strip()
