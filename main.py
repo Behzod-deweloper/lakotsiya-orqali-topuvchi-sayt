@@ -12,9 +12,9 @@ HTML_CONTENT = r"""
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aniq Joylashuv va Eng Yaqin Maktab</title>
 
-    <!-- 1. Monetag Anti-AdBlock / In-Page Push yoki SDK скрипт (Вставьте ваш код из Monetag здесь) -->
-    <!-- Пример скрипта Monetag: -->
-    <!-- <script src="https://alwingulla.com/88/tag.min.js" data-zone="XXXXXX" async data-cfasync="false"></script> -->
+    <!-- 1. Monetag Reklama Skripti (Kabinetdan olingan skriptni joylang) -->
+    <!-- Masalan: In-Page Push yoki Onclick / Popunder kodi -->
+    <!-- <script src="https://alwingulla.com/88/tag.min.js" data-zone="YOUR_ZONE_ID" async data-cfasync="false"></script> -->
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,7 +65,22 @@ HTML_CONTENT = r"""
             word-break: break-word;
             max-width: 60%;
         }
-        /* Рекламный блок */
+        .btn-location {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s ease;
+        }
+        .btn-location:hover {
+            background: #5a67d8;
+        }
         .ad-container {
             margin-top: 20px;
             width: 100%;
@@ -84,15 +99,17 @@ HTML_CONTENT = r"""
 <div class="card">
     <h2>📍 Joylashuv va Maktab Tizimi</h2>
     <div class="info">IP Manzil: <span id="ip">Yuklanmoqda...</span></div>
-    <div class="info">Aniq Manzil: <span id="location">GPS kutilmoqda...</span></div>
-    <div class="info">Eng Yaqin Maktab: <span id="school">Qidirilmoqda...</span></div>
+    <div class="info">Aniq Manzil: <span id="location">Ruxsat berilmagan</span></div>
+    <div class="info">Eng Yaqin Maktab: <span id="school">Kutilmoqda...</span></div>
     <div class="info">Qurilma Nomi: <span id="device-model">Aniqlanmoqda...</span></div>
     <div class="info">Versiya: <span id="os-version">Aniqlanmoqda...</span></div>
+
+    <button class="btn-location" onclick="requestLocation()">📍 Joylashuvni Anqlash</button>
 </div>
 
-<!-- 2. Рекламный баннер под карточкой (если выбрали формат Banner / Native Banner) -->
+<!-- 2. Banner yoki Native Reklama joyi -->
 <div class="ad-container">
-    <!-- Вставьте код баннера из личного кабинета Monetag сюда -->
+    <!-- Monetag Banner kodi shu yerga tashlanadi -->
 </div>
 
 <script>
@@ -189,84 +206,96 @@ HTML_CONTENT = r"""
         return R * c;
     }
 
-    async function loadData() {
+    async function loadIP() {
         try {
             let res = await fetch('/api/info');
             let data = await res.json();
             document.getElementById('ip').innerText = data.ip_manzili;
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(async (position) => {
-                    let lat = position.coords.latitude;
-                    let lon = position.coords.longitude;
-
-                    try {
-                        let geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=uz`);
-                        let geoData = await geoRes.json();
-                        let addr = geoData.address;
-
-                        let parts = [];
-                        if (addr.state || addr.region) parts.push(addr.state || addr.region);
-                        if (addr.city || addr.town || addr.county) parts.push(addr.city || addr.town || addr.county);
-                        if (addr.suburb || addr.district) parts.push(addr.suburb || addr.district);
-                        if (addr.neighbourhood || addr.quarter) parts.push(addr.neighbourhood || addr.quarter);
-                        if (addr.road) parts.push(addr.road + " ko'chasi");
-
-                        document.getElementById('location').innerText = parts.length > 0 ? parts.join(", ") : "Topildi";
-                    } catch (err) {
-                        document.getElementById('location').innerText = "Manzilni aniqlab bo'lmadi";
-                    }
-
-                    try {
-                        let overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=school](around:4000,${lat},${lon});way[amenity=school](around:4000,${lat},${lon}););out center;`;
-                        let schoolRes = await fetch(overpassUrl);
-                        let schoolData = await schoolRes.json();
-                        let elements = schoolData.elements;
-
-                        if (elements && elements.length > 0) {
-                            let nearest = null;
-                            let minDistance = Infinity;
-
-                            elements.forEach(el => {
-                                let sLat = el.lat || (el.center ? el.center.lat : null);
-                                let sLon = el.lon || (el.center ? el.center.lon : null);
-                                if (sLat && sLon) {
-                                    let dest = calculateDistance(lat, lon, sLat, sLon);
-                                    if (dest < minDistance) {
-                                        minDistance = dest;
-                                        nearest = el;
-                                    }
-                                }
-                            });
-
-                            if (nearest) {
-                                let tags = nearest.tags || {};
-                                let schoolName = tags.name || tags["name:uz"] || tags["name:ru"] || tags.official_name;
-                                if (!schoolName && tags.ref) schoolName = `${tags.ref}-maktab`;
-                                if (!schoolName) schoolName = "Nomi kiritilmagan maktab";
-
-                                let distText = minDistance > 1000 ? (minDistance / 1000).toFixed(1) + " km" : Math.round(minDistance) + " metr";
-                                document.getElementById('school').innerText = `${schoolName} (~${distText})`;
-                            } else {
-                                document.getElementById('school').innerText = "Yaqin atrofda maktab topilmadi";
-                            }
-                        } else {
-                            document.getElementById('school').innerText = "Maktablar bazada topilmadi";
-                        }
-                    } catch (err) {
-                        document.getElementById('school').innerText = "Maktabni qidirishda xatolik";
-                    }
-
-                }, (error) => {
-                    document.getElementById('location').innerText = "Joylashuvga ruxsat berilmadi ❌";
-                    document.getElementById('school').innerText = "Mavjud emas";
-                }, { enableHighAccuracy: true });
-            }
         } catch (e) {
             console.error(e);
         }
     }
-    loadData();
+
+    function requestLocation() {
+        document.getElementById('location').innerText = "Ruxsat so'ralmoqda...";
+        document.getElementById('school').innerText = "Qidirilmoqda...";
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                let lat = position.coords.latitude;
+                let lon = position.coords.longitude;
+
+                try {
+                    let geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=uz`);
+                    let geoData = await geoRes.json();
+                    let addr = geoData.address;
+
+                    let parts = [];
+                    if (addr.state || addr.region) parts.push(addr.state || addr.region);
+                    if (addr.city || addr.town || addr.county) parts.push(addr.city || addr.town || addr.county);
+                    if (addr.suburb || addr.district) parts.push(addr.suburb || addr.district);
+                    if (addr.neighbourhood || addr.quarter) parts.push(addr.neighbourhood || addr.quarter);
+                    if (addr.road) parts.push(addr.road + " ko'chasi");
+
+                    document.getElementById('location').innerText = parts.length > 0 ? parts.join(", ") : "Topildi";
+                } catch (err) {
+                    document.getElementById('location').innerText = "Manzilni aniqlab bo'lmadi";
+                }
+
+                try {
+                    let overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node[amenity=school](around:4000,${lat},${lon});way[amenity=school](around:4000,${lat},${lon}););out center;`;
+                    let schoolRes = await fetch(overpassUrl);
+                    let schoolData = await schoolRes.json();
+                    let elements = schoolData.elements;
+
+                    if (elements && elements.length > 0) {
+                        let nearest = null;
+                        let minDistance = Infinity;
+
+                        elements.forEach(el => {
+                            let sLat = el.lat || (el.center ? el.center.lat : null);
+                            let sLon = el.lon || (el.center ? el.center.lon : null);
+                            if (sLat && sLon) {
+                                let dest = calculateDistance(lat, lon, sLat, sLon);
+                                if (dest < minDistance) {
+                                    minDistance = dest;
+                                    nearest = el;
+                                }
+                            }
+                        });
+
+                        if (nearest) {
+                            let tags = nearest.tags || {};
+                            let schoolName = tags.name || tags["name:uz"] || tags["name:ru"] || tags.official_name;
+                            if (!schoolName && tags.ref) schoolName = `${tags.ref}-maktab`;
+                            if (!schoolName) schoolName = "Nomi kiritilmagan maktab";
+
+                            let distText = minDistance > 1000 ? (minDistance / 1000).toFixed(1) + " km" : Math.round(minDistance) + " metr";
+                            document.getElementById('school').innerText = `${schoolName} (~${distText})`;
+                        } else {
+                            document.getElementById('school').innerText = "Yaqin atrofda maktab topilmadi";
+                        }
+                    } else {
+                        document.getElementById('school').innerText = "Maktablar bazada topilmadi";
+                    }
+                } catch (err) {
+                    document.getElementById('school').innerText = "Maktabni qidirishda xatolik";
+                }
+
+            }, (error) => {
+                document.getElementById('location').innerText = "Joylashuvga ruxsat berilmadi ❌";
+                document.getElementById('school').innerText = "Mavjud emas";
+            }, { enableHighAccuracy: true });
+        } else {
+            document.getElementById('location').innerText = "Brauzer geolokatsiyani qo'llab-quvvatlamaydi";
+        }
+    }
+
+    // Sahifa yuklanganda avtomatik ravishda lokatsiyani va IP ni so'rash
+    window.onload = function() {
+        loadIP();
+        requestLocation();
+    };
 </script>
 </body>
 </html>
@@ -278,11 +307,9 @@ def home():
     return HTML_CONTENT
 
 
-# 3. Эндпоинт для подтверждения сайта Monetag через JS-файл
-# Положите JS-файл от Monetag в папку проекта (например, с именем sw.js)
 @app.get("/sw.js")
 def get_monetag_sw():
-    js_file_path = "sw.js"  # Укажите точное имя файла, который вы скачали
+    js_file_path = "sw.js"
     if os.path.exists(js_file_path):
         return FileResponse(js_file_path, media_type="application/javascript")
     return {"error": "File not found"}
